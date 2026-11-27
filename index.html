@@ -144,7 +144,7 @@ h1{
 }
 
 /* 頂部切換掣 */
-.switches{border:2px solid var(--ink);background:var(--cell);margin-top:6px}
+.switches{border:2px solid var(--ink);background:var(--cell);margin-bottom:12px}
 .row{display:flex;align-items:stretch;border-bottom:1px solid var(--ink)}
 .row:last-child{border-bottom:0}
 .row-label{
@@ -224,6 +224,9 @@ input:focus-visible{outline:3px solid var(--text);outline-offset:1px}
 
 /* 備註 */
 .notes{padding:10px}
+#extraText{margin-top:0}
+.keep{display:flex;align-items:center;gap:9px;min-height:44px;margin-top:4px;font-size:16px;font-weight:700}
+.keep input{width:22px;height:22px;flex:none;accent-color:var(--ink)}
 .tags{display:flex;flex-wrap:wrap;gap:8px}
 .tags button{
   min-height:40px;padding:0 14px;border:1.5px dashed var(--ink);border-radius:99px;
@@ -295,14 +298,23 @@ dialog button{
     <div class="sub">落單紙</div>
   </header>
 
+  <nav class="menu-tabs" id="menuTabs"></nav>
+
   <div class="switches">
     <div class="row"><div class="row-label">邊日</div><div class="seg" id="segDay"></div></div>
     <div class="row"><div class="row-label">邊餐</div><div class="seg" id="segMeal"></div></div>
     <div class="row"><div class="row-label">點食</div><div class="seg" id="segPlace"></div></div>
   </div>
 
-  <nav class="menu-tabs" id="menuTabs"></nav>
   <main id="menu"></main>
+
+  <section>
+    <h2>想食其他嘢</h2>
+    <div class="notes">
+      <textarea id="extraText" aria-label="餐牌冇嘅餸，一行一款" placeholder="餐牌冇嘅餸寫喺度，一行一款"></textarea>
+      <label class="keep"><input type="checkbox" id="extraKeep">建議加入常設餐牌</label>
+    </div>
+  </section>
 
   <section>
     <h2>茶記備註</h2>
@@ -367,6 +379,8 @@ function freshState() {
     menu: "hot",
     picks: { hot: {}, cold: {} },  // 熱、凍各自記住，互相唔影響
     prefs: { hot: {}, cold: {} }, // 時令嗰啲寫低嘅喜好
+    extra: "",       // 餐牌冇嘅餸，一行一款
+    extraKeep: false,
     tags: [],
     note: ""
   };
@@ -420,6 +434,9 @@ function selected() {
 }
 
 const totalOf = groups => groups.reduce((n, g) => n + g.items.length, 0);
+const extraDishes = () => state.extra.split("\n").map(line => line.trim()).filter(Boolean);
+// 成張單幾多項：餐牌揀嘅 + 自己寫嘅
+const orderCount = () => totalOf(selected()) + extraDishes().length;
 
 /* ---------- 畫面 ---------- */
 function renderSegments() {
@@ -615,7 +632,7 @@ function renderTags() {
 
 function update() {
   painters.forEach(paint => paint());
-  $("count").textContent = totalOf(selected());
+  $("count").textContent = orderCount();
   disarmReset();
   save();
 }
@@ -641,15 +658,20 @@ function orderText() {
     group.items.forEach(i => lines.push(
       `✅ ${i.name}${i.option ? `（${i.option}）` : ""}${i.pref ? `：${i.pref}` : ""}`));
   });
+  const extras = extraDishes();
+  if (extras.length) {
+    lines.push("", "【想食其他嘢】", ...extras.map(dish => `✨ ${dish}`));
+    if (state.extraKeep) lines.push("💡 建議加入常設餐牌");
+  }
   const notes = [...CONFIG.quickNotes.filter(t => state.tags.includes(t)), state.note.trim()]
     .filter(Boolean);
   if (notes.length) lines.push("", `📝 備註：${notes.join("、")}`);
-  lines.push("", `共 ${totalOf(groups)} 項，唔該晒 🙏`);
+  lines.push("", `共 ${orderCount()} 項，唔該晒 🙏`);
   return lines.join("\n");
 }
 
 function readyToOrder() {
-  if (totalOf(selected())) return true;
+  if (orderCount()) return true;
   toast("未揀任何餸喎");
   return false;
 }
@@ -705,6 +727,8 @@ $("resetBtn").addEventListener("click", () => {
   const menu = state.menu;
   state = Object.assign(freshState(), { menu });
   $("noteText").value = "";
+  $("extraText").value = "";
+  $("extraKeep").checked = false;
   renderSegments();
   renderTags();
   update();
@@ -733,11 +757,25 @@ $("noteText").addEventListener("input", e => {
   save();
 });
 
+$("extraText").addEventListener("input", e => {
+  state.extra = e.target.value;
+  $("count").textContent = orderCount();
+  disarmReset();
+  save();
+});
+$("extraKeep").addEventListener("change", e => {
+  state.extraKeep = e.target.checked;
+  disarmReset();
+  save();
+});
+
 /* ---------- 開頁 ---------- */
 if (!MENU_DATA[state.menu]) state.menu = "hot";
 $("shopName").textContent = CONFIG.shopName;
 document.title = `${CONFIG.shopName}・落單紙`;
 $("noteText").value = state.note;
+$("extraText").value = state.extra;
+$("extraKeep").checked = state.extraKeep;
 renderSegments();
 renderTabs();
 renderMenu();
