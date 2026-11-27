@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="落單">
+<title>住家車仔餸・落單紙</title>
+
+<script>
+/* ============================================================
+   ① 設定：改舖名、電話
+   ============================================================ */
+const CONFIG = {
+  shopName: "住家車仔餸",
+  // WhatsApp 號碼：連區號、唔使「+」，例如 "852XXXXXXXX"。
+  // 留空 = WhatsApp 開咗之後自己揀聯絡人。
+  whatsappNumber: "",
+  quickNotes: ["少油", "少鹽", "多麻醬", "醬汁另上", "走蔥", "加辣"],
+  rememberHours: 12   // 已揀嘅嘢記住幾耐（唔小心閂咗頁都仲喺度）
+};
+
+/* ============================================================
+   ② 餐牌：加餸喺呢度
+   冇選項：直接寫個名            "雞翼"
+   有煮法：{ name: "韭菜餃", options: ["煎", "蒸"] }
+   撳菜名就用預設：加 default     default: "正常"
+   細字備注：加 hint             hint: "時令・視乎街市有咩買"
+   俾佢寫喜好：加 ask            ask: "想食咩菜？"（揀咗先出現）
+   喜好建議掣：加 suggest        suggest: ["生菜", "娃娃菜"]（要同 ask 一齊用）
+   成個分類限屋企食晚餐：喺分類加 dinnerOnly: true
+   同一個分類入面唔好有兩個同名。
+   ============================================================ */
+const SEASONAL = "時令・視乎街市有咩買";
+const FRY_STEAM = ["煎", "蒸"];
+const FRY_ONLY = ["煎"];
+const STIR_BOIL = ["炒", "烚"];
+const COLD_SAUCE = ["麻醬", "鰹魚汁"];
+
+const MENU_DATA = {
+  hot: {
+    tab: "🔥 熱食",
+    title: "熱食",
+    categories: [
+      { name: "主食", items: [
+        { name: "白飯", options: ["正常", "少飯", "多飯"], default: "正常" }
+      ]},
+      { name: "清雞湯麵", dinnerOnly: true, items: ["公仔麵", "米粉", "河粉", "油麵"] },
+      { name: "餃子", items: [
+        { name: "韭菜餃", options: FRY_STEAM },
+        { name: "泡菜餃", options: FRY_STEAM }
+      ]},
+      { name: "肉類／海鮮", items: [
+        { name: "雞柳", options: FRY_STEAM },
+        { name: "雞扒", options: FRY_ONLY, default: "煎" },
+        { name: "豬扒", options: FRY_ONLY, default: "煎" },
+        { name: "雞翼", options: FRY_ONLY, default: "煎" },
+        { name: "漢堡扒", options: FRY_ONLY, default: "煎" },
+        { name: "牛肉", options: FRY_ONLY, default: "煎" },
+        { name: "午餐肉", options: FRY_ONLY, default: "煎" },
+        { name: "三文魚", options: FRY_STEAM }
+      ]},
+      { name: "車仔配料", items: ["燒賣", "廚師腸", "蟹柳", "竹輪", "豆腐", "腐皮"] },
+      { name: "時蔬", items: [
+        { name: "時令菜心", options: STIR_BOIL, hint: SEASONAL, ask: "想食咩菜？（可以唔填）", suggest: ["生菜", "娃娃菜"] },
+        { name: "時令菇類", options: STIR_BOIL, hint: SEASONAL, ask: "想食咩菇？（可以唔填）", suggest: ["金菇", "冬菇"] },
+        { name: "西蘭花", options: STIR_BOIL },
+        { name: "秋葵", options: STIR_BOIL },
+        { name: "番茄", options: STIR_BOIL }
+      ]},
+      { name: "根莖／豆類", items: ["番薯", "南瓜", "粟米", "枝豆"] },
+      { name: "蛋類", items: ["煎蛋", "烚蛋", "水波蛋", "溫泉蛋"] }
+    ]
+  },
+  cold: {
+    tab: "❄️ 凍食／冷麵",
+    title: "凍食／冷麵",
+    categories: [
+      { name: "冷麵主食（揀汁）", items: [
+        { name: "冷 Soba 蕎麥麵", options: COLD_SAUCE },
+        { name: "冷 Udon 烏冬", options: COLD_SAUCE }
+      ]},
+      { name: "冷盤配料／肉類", items: [
+        { name: "雞柳", options: FRY_STEAM },
+        { name: "三文魚", options: FRY_STEAM },
+        "牛肉", "午餐肉", "蟹柳", "竹輪", "冷豆腐", "腐皮"
+      ]},
+      { name: "冷食蔬菜／豆類", items: ["枝豆", "秋葵", "粟米", "番茄", "西蘭花", "番薯", "南瓜"] },
+      { name: "蛋類", items: ["溫泉蛋", "水波蛋", "烚蛋"] }
+    ]
+  }
+};
+</script>
+
+<style>
+:root{
+  --ink:#b8232a;
+  --ink-dark:#8c151b;
+  --tint:#fbe5df;
+  --paper:#fdf8ea;
+  --cell:#fffdf5;
+  --text:#2b211c;
+}
+body.cold{
+  --ink:#1d5c99;
+  --ink-dark:#123f6c;
+  --tint:#dfedf8;
+  --paper:#f6f8f4;
+  --cell:#fdfefc;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{
+  background:var(--paper);
+  color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang HK","Noto Sans HK","Microsoft JhengHei",sans-serif;
+  line-height:1.35;
+  padding-bottom:calc(150px + env(safe-area-inset-bottom));
+}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;touch-action:manipulation}
+button:focus-visible,textarea:focus-visible{outline:3px solid var(--text);outline-offset:1px}
+.wrap{max-width:520px;margin:0 auto;padding:0 10px}
+
+/* 格仔布頭 */
+.gingham{
+  height:22px;
+  background-color:#fff;
+  background-image:
+    linear-gradient(90deg,color-mix(in srgb,var(--ink) 45%,transparent) 50%,transparent 50%),
+    linear-gradient(color-mix(in srgb,var(--ink) 45%,transparent) 50%,transparent 50%);
+  background-size:22px 22px;
+}
+header{text-align:center;padding:12px 0 8px}
+h1{
+  font-family:"Songti TC","Noto Serif HK",PMingLiU,serif;
+  font-size:30px;font-weight:900;color:var(--ink);letter-spacing:3px;
+}
+.sub{
+  display:inline-block;margin-top:4px;padding:2px 14px;
+  border:1.5px solid var(--ink);border-radius:99px;
+  color:var(--ink);font-size:13px;letter-spacing:4px;
+}
+
+/* 頂部切換掣 */
+.switches{border:2px solid var(--ink);background:var(--cell);margin-top:6px}
+.row{display:flex;align-items:stretch;border-bottom:1px solid var(--ink)}
+.row:last-child{border-bottom:0}
+.row-label{
+  width:52px;flex:none;display:flex;align-items:center;justify-content:center;
+  background:var(--tint);color:var(--ink-dark);font-weight:700;font-size:14px;
+  border-right:1px solid var(--ink);
+}
+.seg{flex:1;display:flex;gap:6px;padding:6px}
+.seg button{
+  flex:1;min-height:42px;border:1.5px solid var(--ink);border-radius:6px;
+  background:transparent;color:var(--ink-dark);font-weight:700;font-size:15px;
+}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+.menu-tabs{
+  position:sticky;top:0;z-index:5;background:var(--paper);
+  display:flex;gap:8px;padding:10px 0 8px;
+}
+.menu-tabs button{
+  flex:1;min-height:48px;border:2px solid var(--ink);border-radius:8px;
+  background:var(--cell);color:var(--ink);font-size:17px;font-weight:800;
+}
+.menu-tabs button[aria-pressed="true"]{background:var(--ink);color:#fff}
+
+/* 餐牌格仔 */
+section{border:2px solid var(--ink);margin-bottom:12px;background:var(--cell)}
+section h2{
+  background:var(--ink);color:#fff;font-size:15px;letter-spacing:2px;
+  padding:5px 10px;
+}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--ink)}
+.item{background:var(--cell);min-width:0}
+.item.on{background:var(--tint)}
+.item.wide{grid-column:1 / -1;display:flex;align-items:center;flex-wrap:wrap}
+.item.filler{background:var(--cell)}
+.pick{
+  display:flex;align-items:center;gap:9px;width:100%;min-height:52px;
+  padding:8px 10px;border:0;background:transparent;text-align:left;
+}
+.item.wide .pick{flex:1 1 140px;width:auto}
+.box{
+  flex:none;width:23px;height:23px;border:2px solid var(--ink);background:#fff;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--ink);font-size:23px;font-weight:900;line-height:1;
+}
+.item.on .box::after{content:"✓";transform:translate(2px,-3px) rotate(-8deg)}
+.name{display:block;font-size:17px;font-weight:700}
+.hint{display:block;font-size:11.5px;color:var(--ink);margin-top:1px}
+.opts{display:flex;gap:6px;padding:6px 8px 6px 0;margin-left:auto}
+.opts button{
+  min-width:50px;min-height:42px;padding:0 8px;
+  border:1.5px solid var(--ink);border-radius:6px;
+  background:#fff;color:var(--ink-dark);font-weight:700;font-size:15px;
+}
+.opts button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.item.nudge .opts{animation:nudge .5s ease 2}
+@keyframes nudge{
+  25%{transform:translateX(-6px)}
+  75%{transform:translateX(4px)}
+}
+
+.extra{flex:0 0 calc(100% - 50px);margin:0 8px 8px 42px;min-width:0}
+.extra[hidden]{display:none}
+.sugs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:6px}
+.sugs span{font-size:12.5px;color:var(--ink)}
+.sugs button{
+  min-height:38px;padding:0 12px;border:1.5px dashed var(--ink);border-radius:99px;
+  background:#fff;color:var(--ink-dark);font-weight:700;font-size:14px;
+}
+.sugs button[aria-pressed="true"]{border-style:solid;background:var(--ink);color:#fff}
+.pref{
+  width:100%;min-height:42px;padding:8px 10px;
+  border:1.5px dashed var(--ink);border-radius:6px;background:#fff;font-size:16px;
+}
+.closed{padding:12px 10px;font-size:14px;color:var(--ink)}
+input:focus-visible{outline:3px solid var(--text);outline-offset:1px}
+
+/* 備註 */
+.notes{padding:10px}
+.tags{display:flex;flex-wrap:wrap;gap:8px}
+.tags button{
+  min-height:40px;padding:0 14px;border:1.5px dashed var(--ink);border-radius:99px;
+  background:#fff;color:var(--ink-dark);font-weight:700;font-size:15px;
+}
+.tags button[aria-pressed="true"]{border-style:solid;background:var(--ink);color:#fff}
+textarea{
+  width:100%;margin-top:10px;padding:10px;min-height:76px;resize:vertical;
+  border:1.5px solid var(--ink);border-radius:6px;background:#fff;
+  font-size:16px; /* 細過 16px，iPhone 會自動放大個畫面 */
+}
+
+/* 底部落單列 */
+.bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:10;
+  background:var(--cell);border-top:3px double var(--ink);
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  box-shadow:0 -4px 14px rgba(0,0,0,.12);
+}
+.bar-in{max-width:500px;margin:0 auto}
+.bar-top{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.count{
+  flex:1;text-align:left;border:0;background:transparent;min-height:36px;
+  font-size:16px;font-weight:700;
+}
+.count b{color:var(--ink);font-size:22px}
+.count small{color:var(--ink);text-decoration:underline;margin-left:6px;font-size:13px}
+.bar button.plain{
+  min-height:40px;padding:0 12px;border:1.5px solid var(--ink);border-radius:6px;
+  background:#fff;color:var(--ink-dark);font-weight:700;font-size:14px;
+}
+.bar button.plain.armed{background:var(--ink);color:#fff}
+.send{
+  width:100%;min-height:52px;border:0;border-radius:8px;
+  background:#137a42;color:#fff;font-size:19px;font-weight:800;letter-spacing:1px;
+}
+
+/* 預覽 */
+dialog{
+  width:min(92vw,460px);max-height:78vh;margin:auto;padding:16px;
+  border:2px solid var(--ink);border-radius:10px;background:var(--cell);color:var(--text);
+}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog pre{white-space:pre-wrap;word-break:break-word;font:inherit;font-size:16px}
+dialog button{
+  width:100%;min-height:46px;margin-top:14px;border:0;border-radius:8px;
+  background:var(--ink);color:#fff;font-weight:700;
+}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));z-index:20;
+  transform:translateX(-50%);max-width:90vw;width:max-content;
+  background:rgba(35,25,20,.92);color:#fff;padding:10px 18px;border-radius:99px;
+  font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;
+}
+.toast.show{opacity:1}
+
+@media (prefers-reduced-motion:reduce){
+  .item.nudge .opts{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="gingham"></div>
+<div class="wrap">
+  <header>
+    <h1 id="shopName"></h1>
+    <div class="sub">落單紙</div>
+  </header>
+
+  <div class="switches">
+    <div class="row"><div class="row-label">邊日</div><div class="seg" id="segDay"></div></div>
+    <div class="row"><div class="row-label">邊餐</div><div class="seg" id="segMeal"></div></div>
+    <div class="row"><div class="row-label">點食</div><div class="seg" id="segPlace"></div></div>
+  </div>
+
+  <nav class="menu-tabs" id="menuTabs"></nav>
+  <main id="menu"></main>
+
+  <section>
+    <h2>茶記備註</h2>
+    <div class="notes">
+      <div class="tags" id="tags"></div>
+      <textarea id="noteText" aria-label="其他備註" placeholder="仲有咩要講？例如：唔好太熟、想飲湯…"></textarea>
+    </div>
+  </section>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="bar-top">
+      <button type="button" class="count" id="countBtn">已揀 <b id="count">0</b> 項<small>睇張單</small></button>
+      <button type="button" class="plain" id="resetBtn">重設</button>
+      <button type="button" class="plain" id="copyBtn">複製</button>
+    </div>
+    <button type="button" class="send" id="sendBtn">💬 WhatsApp 落單</button>
+  </div>
+</div>
+
+<dialog id="preview">
+  <pre id="previewText"></pre>
+  <button type="button" id="closeBtn">返去繼續揀</button>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+"use strict";
+
+const CHOICES = {
+  day:   { today: "今日", tomorrow: "聽日" },
+  meal:  { lunch: "午餐", dinner: "晚餐" },
+  place: { home: "🏠 屋企食", box: "🍱 帶飯" }
+};
+const STORE_KEY = "home-menu-order-v1";
+
+const $ = id => document.getElementById(id);
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function button(className, text, onClick) {
+  const b = el("button", className, text);
+  b.type = "button";
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+/* ---------- 狀態 ---------- */
+function freshState() {
+  const early = new Date().getHours() < 11;
+  return {
+    day: "today",
+    meal: early ? "lunch" : "dinner",
+    place: "home",
+    menu: "hot",
+    picks: { hot: {}, cold: {} },  // 熱、凍各自記住，互相唔影響
+    prefs: { hot: {}, cold: {} }, // 時令嗰啲寫低嘅喜好
+    tags: [],
+    note: ""
+  };
+}
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (saved && Date.now() - saved.at < CONFIG.rememberHours * 3600e3) {
+      return Object.assign(freshState(), saved.state);
+    }
+  } catch (e) { /* 讀唔到就由頭嚟過 */ }
+  return freshState();
+}
+
+let state = loadState();
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify({ at: Date.now(), state }));
+  } catch (e) { /* 私隱模式可能寫唔到，唔影響落單 */ }
+}
+
+/* ---------- 餐牌資料整理 ---------- */
+const asItem = raw => typeof raw === "string" ? { name: raw } : raw;
+const keyOf = (cat, item) => cat.name + "|" + item.name;
+
+const available = cat => !cat.dinnerOnly || (state.meal === "dinner" && state.place === "home");
+
+// 轉咗餐次之後，有幾多項已揀嘅餸今張單唔計
+function dinnerOnlyPicked() {
+  return MENU_DATA[state.menu].categories.filter(cat => cat.dinnerOnly)
+    .flatMap(cat => cat.items.map(asItem).filter(item => keyOf(cat, item) in state.picks[state.menu]))
+    .length;
+}
+
+// 只計而家餐牌上仲存在嘅餸（改過餐牌之後，舊記錄唔會混入張單）
+function selected() {
+  const picks = state.picks[state.menu];
+  return MENU_DATA[state.menu].categories.filter(available).map(cat => ({
+    name: cat.name,
+    items: cat.items.map(asItem).flatMap(item => {
+      const key = keyOf(cat, item);
+      if (!(key in picks)) return [];
+      const option = picks[key];
+      if (item.options && !item.options.includes(option)) return [];
+      const pref = item.ask ? (state.prefs[state.menu][key] || "").trim() : "";
+      return [{ name: item.name, option: item.options ? option : "", pref }];
+    })
+  })).filter(group => group.items.length);
+}
+
+const totalOf = groups => groups.reduce((n, g) => n + g.items.length, 0);
+
+/* ---------- 畫面 ---------- */
+function renderSegments() {
+  [["segDay", "day"], ["segMeal", "meal"], ["segPlace", "place"]].forEach(([id, field]) => {
+    $(id).replaceChildren(...Object.entries(CHOICES[field]).map(([value, label]) => {
+      const b = button("", label, () => {
+        state[field] = value;
+        // 帶飯通常係聽日午餐，幫佢預先揀好（之後仍然可以改）
+        if (field === "place" && value === "box") {
+          state.day = "tomorrow";
+          state.meal = "lunch";
+        }
+        renderMenu();
+        update();
+        renderSegments();
+        const skipped = dinnerOnlyPicked();
+        if (skipped && (state.meal !== "dinner" || state.place !== "home")) {
+          toast(`清雞湯麵只限屋企食晚餐，揀咗嘅 ${skipped} 項今張單唔計`);
+        }
+      });
+      b.setAttribute("aria-pressed", String(state[field] === value));
+      return b;
+    }));
+  });
+}
+
+function renderTabs() {
+  $("menuTabs").replaceChildren(...Object.entries(MENU_DATA).map(([id, menu]) => {
+    const b = button("", menu.tab, () => {
+      if (state.menu === id) return;
+      const leftBehind = totalOf(selected());
+      const oldTitle = MENU_DATA[state.menu].title;
+      state.menu = id;
+      renderTabs();
+      renderMenu();
+      update();
+      if (leftBehind) toast(`${oldTitle}揀咗嘅 ${leftBehind} 項留低咗，今張單唔會計`);
+    });
+    b.setAttribute("aria-pressed", String(state.menu === id));
+    return b;
+  }));
+  document.body.classList.toggle("cold", state.menu === "cold");
+}
+
+// 每個菜嘅畫面更新函數：撳掣只改 class，唔使成頁重畫
+let painters = [];
+
+function renderMenu() {
+  painters = [];
+  $("menu").replaceChildren(...MENU_DATA[state.menu].categories.map(cat => {
+    const section = el("section");
+    if (!available(cat)) {
+      section.append(el("h2", "", cat.name),
+        el("p", "closed", "只限屋企食嘅晚餐（帶唔到飯）"));
+      return section;
+    }
+    const grid = el("div", "grid");
+    let halfCells = 0;
+    const fillGap = () => {
+      if (halfCells % 2) grid.append(el("div", "item filler"));
+      halfCells = 0;
+    };
+
+    cat.items.map(asItem).forEach(item => {
+      const wide = Boolean(item.options) || item.name.length > 9;
+      if (wide) fillGap(); else halfCells++;
+      grid.append(renderItem(cat, item, wide));
+    });
+    fillGap();
+
+    section.append(el("h2", "", cat.dinnerOnly ? `${cat.name}（限屋企食晚餐）` : cat.name), grid);
+    return section;
+  }));
+}
+
+function renderItem(cat, item, wide) {
+  const key = keyOf(cat, item);
+  const picks = () => state.picks[state.menu];
+  const cell = el("div", wide ? "item wide" : "item");
+
+  const main = button("pick", undefined, () => {
+    if (key in picks()) {
+      delete picks()[key];
+    } else if (!item.options) {
+      picks()[key] = "";
+    } else if (item.default) {
+      picks()[key] = item.default;
+    } else {
+      // 唔幫佢估煎定蒸：晃一晃啲細掣，叫佢自己揀
+      cell.classList.remove("nudge");
+      void cell.offsetWidth;
+      cell.classList.add("nudge");
+      toast(`${item.name}：想${item.options.join("定")}？`);
+      return;
+    }
+    update();
+  });
+  const label = el("span");
+  label.append(el("span", "name", item.name));
+  if (item.hint) label.append(el("span", "hint", item.hint));
+  main.append(el("span", "box"), label);
+  cell.append(main);
+
+  const optionButtons = [];
+  if (item.options) {
+    const opts = el("div", "opts");
+    item.options.forEach(option => {
+      const b = button("", option, () => {
+        if (picks()[key] === option) delete picks()[key];
+        else picks()[key] = option;
+        update();
+      });
+      b.setAttribute("aria-label", `${item.name} ${option}`);
+      optionButtons.push([b, option]);
+      opts.append(b);
+    });
+    cell.append(opts);
+  }
+
+  let prefInput;
+  const suggestButtons = [];
+  if (item.ask) {
+    prefInput = el("input", "pref");
+    prefInput.type = "text";
+    prefInput.placeholder = item.ask;
+    prefInput.setAttribute("aria-label", `${item.name}：${item.ask}`);
+    prefInput.addEventListener("input", () => {
+      state.prefs[state.menu][key] = prefInput.value;
+      disarmReset();
+      save();
+    });
+    const extra = el("div", "extra");
+    extra.hidden = true;
+    if (item.suggest) {
+      const row = el("div", "sugs");
+      row.append(el("span", "", "建議（唔一定有）："));
+      item.suggest.forEach(word => {
+        const b = button("", word, () => {
+          const words = prefWords();
+          state.prefs[state.menu][key] = (words.includes(word)
+            ? words.filter(w => w !== word)
+            : [...words, word]).join("、");
+          update();
+        });
+        suggestButtons.push([b, word]);
+        row.append(b);
+      });
+      extra.append(row);
+    }
+    extra.append(prefInput);
+    prefInput.addEventListener("input", paintSuggestions);
+    cell.append(extra);
+  }
+
+  function prefWords() {
+    return (state.prefs[state.menu][key] || "").split(/[、,，]/).map(w => w.trim()).filter(Boolean);
+  }
+  function paintSuggestions() {
+    const words = prefWords();
+    suggestButtons.forEach(([b, word]) =>
+      b.setAttribute("aria-pressed", String(words.includes(word))));
+  }
+
+  painters.push(() => {
+    const on = key in picks();
+    if (prefInput) {
+      prefInput.parentElement.hidden = !on;
+      paintSuggestions();
+      const value = state.prefs[state.menu][key] || "";
+      if (prefInput.value !== value) prefInput.value = value;
+    }
+    cell.classList.toggle("on", on);
+    main.setAttribute("aria-pressed", String(on));
+    optionButtons.forEach(([b, option]) =>
+      b.setAttribute("aria-pressed", String(picks()[key] === option)));
+  });
+  return cell;
+}
+
+function renderTags() {
+  $("tags").replaceChildren(...CONFIG.quickNotes.map(tag => {
+    const b = button("", tag, () => {
+      state.tags = state.tags.includes(tag)
+        ? state.tags.filter(t => t !== tag)
+        : [...state.tags, tag];
+      b.setAttribute("aria-pressed", String(state.tags.includes(tag)));
+      update();
+    });
+    b.setAttribute("aria-pressed", String(state.tags.includes(tag)));
+    return b;
+  }));
+}
+
+function update() {
+  painters.forEach(paint => paint());
+  $("count").textContent = totalOf(selected());
+  disarmReset();
+  save();
+}
+
+/* ---------- 落單文字 ---------- */
+function dateText() {
+  const d = new Date();
+  if (state.day === "tomorrow") d.setDate(d.getDate() + 1);
+  return `${d.getMonth() + 1}月${d.getDate()}日（星期${"日一二三四五六"[d.getDay()]}）`;
+}
+
+function orderText() {
+  const groups = selected();
+  // 寫埋實際日期：就算遲咗先睇訊息，「聽日」都唔會搞亂
+  const lines = [
+    `🧾 ${CONFIG.shopName}・落單`,
+    `📅 ${CHOICES.day[state.day]}${CHOICES.meal[state.meal]}　${dateText()}`,
+    CHOICES.place[state.place],
+    `${MENU_DATA[state.menu].tab} Menu`
+  ];
+  groups.forEach(group => {
+    lines.push("", `【${group.name}】`);
+    group.items.forEach(i => lines.push(
+      `✅ ${i.name}${i.option ? `（${i.option}）` : ""}${i.pref ? `：${i.pref}` : ""}`));
+  });
+  const notes = [...CONFIG.quickNotes.filter(t => state.tags.includes(t)), state.note.trim()]
+    .filter(Boolean);
+  if (notes.length) lines.push("", `📝 備註：${notes.join("、")}`);
+  lines.push("", `共 ${totalOf(groups)} 項，唔該晒 🙏`);
+  return lines.join("\n");
+}
+
+function readyToOrder() {
+  if (totalOf(selected())) return true;
+  toast("未揀任何餸喎");
+  return false;
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    // 舊手機或者非 https 網址用呢個後備方法
+    const area = el("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.cssText = "position:fixed;opacity:0";
+    document.body.append(area);
+    area.select();
+    area.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  }
+}
+
+function whatsappUrl(text) {
+  const number = CONFIG.whatsappNumber.replace(/\D/g, "");
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+}
+
+/* ---------- 底部掣 ---------- */
+let toastTimer;
+function toast(message) {
+  $("toast").textContent = message;
+  $("toast").classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("toast").classList.remove("show"), 2200);
+}
+
+// 重設要撳兩下，費事撳錯就清晒
+let resetTimer;
+function disarmReset() {
+  clearTimeout(resetTimer);
+  $("resetBtn").classList.remove("armed");
+  $("resetBtn").textContent = "重設";
+}
+
+$("resetBtn").addEventListener("click", () => {
+  if (!$("resetBtn").classList.contains("armed")) {
+    $("resetBtn").classList.add("armed");
+    $("resetBtn").textContent = "再撳清晒";
+    resetTimer = setTimeout(disarmReset, 3000);
+    return;
+  }
+  const menu = state.menu;
+  state = Object.assign(freshState(), { menu });
+  $("noteText").value = "";
+  renderSegments();
+  renderTags();
+  update();
+  toast("清晒喇");
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  if (!readyToOrder()) return;
+  toast(await copyText(orderText()) ? "複製咗，可以貼去任何地方" : "複製唔到，撳「睇張單」自己抄");
+});
+
+$("sendBtn").addEventListener("click", () => {
+  if (!readyToOrder()) return;
+  window.location.href = whatsappUrl(orderText());
+});
+
+$("countBtn").addEventListener("click", () => {
+  if (!readyToOrder()) return;
+  $("previewText").textContent = orderText();
+  $("preview").showModal();
+});
+$("closeBtn").addEventListener("click", () => $("preview").close());
+
+$("noteText").addEventListener("input", e => {
+  state.note = e.target.value;
+  save();
+});
+
+/* ---------- 開頁 ---------- */
+if (!MENU_DATA[state.menu]) state.menu = "hot";
+$("shopName").textContent = CONFIG.shopName;
+document.title = `${CONFIG.shopName}・落單紙`;
+$("noteText").value = state.note;
+renderSegments();
+renderTabs();
+renderMenu();
+renderTags();
+update();
+</script>
+</body>
+</html>
